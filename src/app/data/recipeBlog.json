@@ -1,0 +1,23 @@
+[
+  {
+    "title": "How to turn an idea into a product recipe",
+    "category": "Product Design",
+    "date": "Coming soon",
+    "readTime": "5 min read",
+    "description": "A practical recipe for shaping a product idea into screens, user flows, and a prototype before the first line of code is written."
+  },
+  {
+    "title": "Planning a sprint kitchen for baker agents",
+    "category": "Delivery",
+    "date": "Coming soon",
+    "readTime": "6 min read",
+    "description": "How we split product work into a clear timeline, prepare tasks for baker agents, and keep every sprint visible for the client."
+  },
+  {
+    "title": "Human quality checks for agent written code",
+    "category": "Quality",
+    "date": "Coming soon",
+    "readTime": "4 min read",
+    "description": "A look at how the master chief reviews, tests, and signs off code so automation stays fast without losing quality."
+  }
+]

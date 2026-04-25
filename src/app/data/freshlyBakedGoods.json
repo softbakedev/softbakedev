@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Nanosandbox",
+    "category": "Sandboxing Platform",
+    "description": "Our VM-isolated sandboxing platform for running baker agents safely, with clean execution environments built for automation work.",
+    "image": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
+    "url": "https://nanosandbox.ai/",
+    "cta": "Open Nanosandbox"
+  },
+  {
+    "title": "Logistics Document Digitalization",
+    "category": "Mobile Development",
+    "description": "Mobile apps for digitizing logistics documents, helping teams capture, process, and move paperwork into reliable digital workflows.",
+    "image": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
+  },
+  {
+    "title": "Cloud Infrastructure Deployment",
+    "category": "DevOps & Cloud",
+    "description": "Cloud infrastructure deployment and delivery automation across AWS, GCP, and Azure, from environments to production-ready pipelines.",
+    "image": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
+  }
+]
