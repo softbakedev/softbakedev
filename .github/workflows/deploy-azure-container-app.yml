@@ -2,8 +2,8 @@ name: Deploy Azure Container App
 
 on:
   push:
-    branches:
-      - feature/new-design
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
