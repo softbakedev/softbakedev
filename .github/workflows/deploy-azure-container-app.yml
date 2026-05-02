@@ -5,28 +5,19 @@ on:
     branches:
       - feature/new-design
   workflow_dispatch:
-    inputs:
-      environment:
-        description: Environment to deploy
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: azure-container-app-${{ inputs.environment || 'dev' }}
+  group: azure-container-app
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy ${{ inputs.environment || 'dev' }}
+    name: Deploy
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'dev' }}
 
     steps:
       - name: Checkout web app
@@ -43,9 +34,8 @@ jobs:
         shell: bash
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
-          deploy_env="${{ inputs.environment || 'dev' }}"
-          echo "IMAGE=ghcr.io/${owner}/softbakedev:${deploy_env}-${GITHUB_SHA}" >> "$GITHUB_ENV"
-          echo "IMAGE_LATEST=ghcr.io/${owner}/softbakedev:${deploy_env}-latest" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${owner}/softbakedev:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE_LATEST=ghcr.io/${owner}/softbakedev:latest" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -85,25 +75,25 @@ jobs:
           MAIL_TO: ${{ vars.MAIL_TO }}
           SMTP_HOST: ${{ vars.SMTP_HOST }}
           SMTP_PORT: ${{ vars.SMTP_PORT }}
+          CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN || 'softbake.dev' }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           IMAGE: ${{ env.IMAGE }}
-          DEPLOY_ENV: ${{ inputs.environment || 'dev' }}
         with:
           azcliversion: latest
           inlineScript: |
             set -euo pipefail
 
             if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_LOCATION" ]; then
-              echo "AZURE_RESOURCE_GROUP and AZURE_LOCATION secrets are required."
+              echo "AZURE_RESOURCE_GROUP and AZURE_LOCATION variables are required."
               exit 1
             fi
 
             az extension add --name containerapp --upgrade
 
-            app_name="softbakedev-${DEPLOY_ENV}"
-            env_name="softbakedev-${DEPLOY_ENV}-env"
-            workspace_name="softbakedev-${DEPLOY_ENV}-law"
+            app_name="softbakedev"
+            env_name="softbakedev-env"
+            workspace_name="softbakedev-law"
 
             workspace_id="$(az monitor log-analytics workspace show \
               --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -186,8 +176,43 @@ jobs:
                   MAIL_TO="$MAIL_TO"
             fi
 
-            az containerapp show \
+            default_fqdn="$(az containerapp show \
               --resource-group "$AZURE_RESOURCE_GROUP" \
               --name "$app_name" \
               --query "properties.configuration.ingress.fqdn" \
-              --output tsv
+              --output tsv)"
+
+            echo "Default Container Apps URL: https://${default_fqdn}"
+
+            if [ -n "${CUSTOM_DOMAIN:-}" ]; then
+              verification_id="$(az containerapp show \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --query "properties.customDomainVerificationId" \
+                --output tsv)"
+              static_ip="$(az containerapp env show \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$env_name" \
+                --query "properties.staticIp" \
+                --output tsv)"
+
+              echo "Custom domain requested: ${CUSTOM_DOMAIN}"
+              echo "For apex domain ${CUSTOM_DOMAIN}, configure DNS:"
+              echo "  A     @                    ${static_ip}"
+              echo "  TXT   asuid                ${verification_id}"
+              echo "If using www.${CUSTOM_DOMAIN}, configure DNS:"
+              echo "  CNAME www                  ${default_fqdn}"
+              echo "  TXT   asuid.www            ${verification_id}"
+
+              if az containerapp hostname bind \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --hostname "$CUSTOM_DOMAIN" \
+                --environment "$env_name" \
+                --validation-method TXT \
+                --output none; then
+                echo "Custom domain bound: https://${CUSTOM_DOMAIN}"
+              else
+                echo "Custom domain binding is not complete yet. Add/propagate the DNS records above, then rerun this workflow."
+              fi
+            fi
