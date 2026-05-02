@@ -1,0 +1,218 @@
+name: Deploy Azure Container App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: azure-container-app
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout web app
+        uses: actions/checkout@v4
+
+      - name: Checkout recipes
+        uses: actions/checkout@v4
+        with:
+          repository: softbakedev/recipes
+          ref: main
+          path: recipes
+
+      - name: Compute image name
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE=ghcr.io/${owner}/softbakedev:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE_LATEST=ghcr.io/${owner}/softbakedev:latest" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          build-contexts: |
+            recipes=./recipes
+          push: true
+          tags: |
+            ${{ env.IMAGE }}
+            ${{ env.IMAGE_LATEST }}
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Upsert Container Apps infrastructure and deploy
+        uses: azure/cli@v2
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          MAIL_TO: ${{ vars.MAIL_TO }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN || 'softbake.dev' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          IMAGE: ${{ env.IMAGE }}
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -euo pipefail
+
+            if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_LOCATION" ]; then
+              echo "AZURE_RESOURCE_GROUP and AZURE_LOCATION variables are required."
+              exit 1
+            fi
+
+            az extension add --name containerapp --upgrade
+
+            app_name="softbakedev"
+            env_name="softbakedev-env"
+            workspace_name="softbakedev-law"
+
+            workspace_id="$(az monitor log-analytics workspace show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --workspace-name "$workspace_name" \
+              --query customerId \
+              --output tsv 2>/dev/null || true)"
+
+            if [ -z "$workspace_id" ]; then
+              workspace_id="$(az monitor log-analytics workspace create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --workspace-name "$workspace_name" \
+                --location "$AZURE_LOCATION" \
+                --query customerId \
+                --output tsv)"
+            fi
+
+            workspace_key="$(az monitor log-analytics workspace get-shared-keys \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --workspace-name "$workspace_name" \
+              --query primarySharedKey \
+              --output tsv)"
+
+            if ! az containerapp env show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$env_name" >/dev/null 2>&1; then
+              az containerapp env create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$env_name" \
+                --location "$AZURE_LOCATION" \
+                --logs-workspace-id "$workspace_id" \
+                --logs-workspace-key "$workspace_key"
+            fi
+
+            if ! az containerapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" >/dev/null 2>&1; then
+              az containerapp create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --environment "$env_name" \
+                --image "$IMAGE" \
+                --ingress external \
+                --target-port 8080 \
+                --registry-server ghcr.io \
+                --registry-username "$GHCR_USERNAME" \
+                --registry-password "$GHCR_TOKEN" \
+                --secrets "smtp-user=$SMTP_USER" "smtp-pass=$SMTP_PASS" \
+                --env-vars \
+                  PORT=8080 \
+                  SMTP_HOST="$SMTP_HOST" \
+                  SMTP_PORT="$SMTP_PORT" \
+                  SMTP_USER=secretref:smtp-user \
+                  SMTP_PASS=secretref:smtp-pass \
+                  MAIL_FROM="$MAIL_FROM" \
+                  MAIL_TO="$MAIL_TO"
+            else
+              az containerapp registry set \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --server ghcr.io \
+                --username "$GHCR_USERNAME" \
+                --password "$GHCR_TOKEN"
+
+              az containerapp secret set \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --secrets "smtp-user=$SMTP_USER" "smtp-pass=$SMTP_PASS"
+
+              az containerapp update \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --image "$IMAGE" \
+                --set-env-vars \
+                  PORT=8080 \
+                  SMTP_HOST="$SMTP_HOST" \
+                  SMTP_PORT="$SMTP_PORT" \
+                  SMTP_USER=secretref:smtp-user \
+                  SMTP_PASS=secretref:smtp-pass \
+                  MAIL_FROM="$MAIL_FROM" \
+                  MAIL_TO="$MAIL_TO"
+            fi
+
+            default_fqdn="$(az containerapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --query "properties.configuration.ingress.fqdn" \
+              --output tsv)"
+
+            echo "Default Container Apps URL: https://${default_fqdn}"
+
+            if [ -n "${CUSTOM_DOMAIN:-}" ]; then
+              verification_id="$(az containerapp show \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --query "properties.customDomainVerificationId" \
+                --output tsv)"
+              static_ip="$(az containerapp env show \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$env_name" \
+                --query "properties.staticIp" \
+                --output tsv)"
+
+              echo "Custom domain requested: ${CUSTOM_DOMAIN}"
+              echo "For apex domain ${CUSTOM_DOMAIN}, configure DNS:"
+              echo "  A     @                    ${static_ip}"
+              echo "  TXT   asuid                ${verification_id}"
+              echo "If using www.${CUSTOM_DOMAIN}, configure DNS:"
+              echo "  CNAME www                  ${default_fqdn}"
+              echo "  TXT   asuid.www            ${verification_id}"
+
+              if az containerapp hostname bind \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --hostname "$CUSTOM_DOMAIN" \
+                --environment "$env_name" \
+                --validation-method TXT \
+                --output none; then
+                echo "Custom domain bound: https://${CUSTOM_DOMAIN}"
+              else
+                echo "Custom domain binding is not complete yet. Add/propagate the DNS records above, then rerun this workflow."
+              fi
+            fi
