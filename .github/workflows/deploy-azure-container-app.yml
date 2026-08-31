@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 concurrency:
   group: azure-container-app
@@ -30,22 +30,49 @@ jobs:
           ref: main
           path: recipes
 
-      - name: Compute image name
-        shell: bash
-        run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "IMAGE=ghcr.io/${owner}/softbakedev:${GITHUB_SHA}" >> "$GITHUB_ENV"
-          echo "IMAGE_LATEST=ghcr.io/${owner}/softbakedev:latest" >> "$GITHUB_ENV"
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Azure login
+        uses: azure/login@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure ACR exists and prepare image tags
+        shell: bash
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          ACR_NAME: ${{ vars.ACR_NAME || 'softbakedevacr01' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_LOCATION" ] || [ -z "$ACR_NAME" ]; then
+            echo "AZURE_RESOURCE_GROUP, AZURE_LOCATION, and ACR_NAME variables are required."
+            exit 1
+          fi
+
+          if ! az acr show --resource-group "$AZURE_RESOURCE_GROUP" --name "$ACR_NAME" >/dev/null 2>&1; then
+            az acr create \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$ACR_NAME" \
+              --location "$AZURE_LOCATION" \
+              --sku Basic
+          fi
+
+          acr_login_server="$(az acr show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$ACR_NAME" \
+            --query loginServer \
+            --output tsv)"
+
+          echo "IMAGE=${acr_login_server}/softbakedev:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE_LATEST=${acr_login_server}/softbakedev:latest" >> "$GITHUB_ENV"
+          echo "ACR_LOGIN_SERVER=${acr_login_server}" >> "$GITHUB_ENV"
+
+          az acr login --name "$ACR_NAME"
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -59,18 +86,12 @@ jobs:
             ${{ env.IMAGE }}
             ${{ env.IMAGE_LATEST }}
 
-      - name: Azure login
-        uses: azure/login@v3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Upsert Container Apps infrastructure and deploy
         uses: azure/cli@v2
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          ACR_NAME: ${{ vars.ACR_NAME || 'softbakedevacr01' }}
           MAIL_FROM: ${{ vars.MAIL_FROM }}
           MAIL_TO: ${{ vars.MAIL_TO }}
           SMTP_HOST: ${{ vars.SMTP_HOST }}
@@ -89,7 +110,32 @@ jobs:
               exit 1
             fi
 
+            if [ -z "$ACR_NAME" ]; then
+              echo "ACR_NAME variable is required."
+              exit 1
+            fi
+
             az extension add --name containerapp --upgrade
+
+            if ! az acr show --resource-group "$AZURE_RESOURCE_GROUP" --name "$ACR_NAME" >/dev/null 2>&1; then
+              az acr create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$ACR_NAME" \
+                --location "$AZURE_LOCATION" \
+                --sku Basic
+            fi
+
+            acr_id="$(az acr show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$ACR_NAME" \
+              --query id \
+              --output tsv)"
+
+            acr_login_server="$(az acr show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$ACR_NAME" \
+              --query loginServer \
+              --output tsv)"
 
             app_name="softbakedev"
             env_name="softbakedev-env"
@@ -137,9 +183,9 @@ jobs:
                 --image "$IMAGE" \
                 --ingress external \
                 --target-port 8080 \
-                --registry-server ghcr.io \
-                --registry-username "$GHCR_USERNAME" \
-                --registry-password "$GHCR_TOKEN" \
+                --system-assigned \
+                --registry-server "$acr_login_server" \
+                --registry-identity system \
                 --secrets "smtp-user=$SMTP_USER" "smtp-pass=$SMTP_PASS" \
                 --env-vars \
                   PORT=8080 \
@@ -150,12 +196,17 @@ jobs:
                   MAIL_FROM="$MAIL_FROM" \
                   MAIL_TO="$MAIL_TO"
             else
+              az containerapp identity assign \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --system-assigned \
+                --output none
+
               az containerapp registry set \
                 --resource-group "$AZURE_RESOURCE_GROUP" \
                 --name "$app_name" \
-                --server ghcr.io \
-                --username "$GHCR_USERNAME" \
-                --password "$GHCR_TOKEN"
+                --server "$acr_login_server" \
+                --identity system
 
               az containerapp secret set \
                 --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -174,6 +225,29 @@ jobs:
                   SMTP_PASS=secretref:smtp-pass \
                   MAIL_FROM="$MAIL_FROM" \
                   MAIL_TO="$MAIL_TO"
+            fi
+
+            principal_id="$(az containerapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --query identity.principalId \
+              --output tsv)"
+
+            if [ -n "$principal_id" ]; then
+              existing_assignment_count="$(az role assignment list \
+                --assignee-object-id "$principal_id" \
+                --scope "$acr_id" \
+                --query "[?roleDefinitionName=='AcrPull'] | length(@)" \
+                --output tsv)"
+
+              if [ "$existing_assignment_count" = "0" ]; then
+                az role assignment create \
+                  --assignee-object-id "$principal_id" \
+                  --assignee-principal-type ServicePrincipal \
+                  --role AcrPull \
+                  --scope "$acr_id" \
+                  --output none
+              fi
             fi
 
             default_fqdn="$(az containerapp show \
