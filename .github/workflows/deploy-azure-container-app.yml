@@ -204,24 +204,6 @@ jobs:
                 --name "$app_name" \
                 --server "$acr_login_server" \
                 --identity system
-
-              az containerapp secret set \
-                --resource-group "$AZURE_RESOURCE_GROUP" \
-                --name "$app_name" \
-                --secrets "smtp-user=$SMTP_USER" "smtp-pass=$SMTP_PASS"
-
-              az containerapp update \
-                --resource-group "$AZURE_RESOURCE_GROUP" \
-                --name "$app_name" \
-                --image "$IMAGE" \
-                --set-env-vars \
-                  PORT=8080 \
-                  SMTP_HOST="$SMTP_HOST" \
-                  SMTP_PORT="$SMTP_PORT" \
-                  SMTP_USER=secretref:smtp-user \
-                  SMTP_PASS=secretref:smtp-pass \
-                  MAIL_FROM="$MAIL_FROM" \
-                  MAIL_TO="$MAIL_TO"
             fi
 
             principal_id="$(az containerapp show \
@@ -238,14 +220,99 @@ jobs:
                 --output tsv)"
 
               if [ "$existing_assignment_count" = "0" ]; then
-                az role assignment create \
-                  --assignee-object-id "$principal_id" \
-                  --assignee-principal-type ServicePrincipal \
-                  --role AcrPull \
-                  --scope "$acr_id" \
-                  --output none
+                echo "Assigning AcrPull to Container App identity on ACR scope..."
+                assignment_succeeded="false"
+                for attempt in 1 2 3 4 5 6; do
+                  if az role assignment create \
+                    --assignee-object-id "$principal_id" \
+                    --assignee-principal-type ServicePrincipal \
+                    --role AcrPull \
+                    --scope "$acr_id" \
+                    --output none 2>/dev/null; then
+                    assignment_succeeded="true"
+                    break
+                  fi
+
+                  if [ "$attempt" -lt 6 ]; then
+                    sleep_seconds="$((attempt * 10))"
+                    echo "AcrPull assignment attempt ${attempt} failed, retrying in ${sleep_seconds}s..."
+                    sleep "$sleep_seconds"
+                  fi
+                done
+
+                if [ "$assignment_succeeded" != "true" ]; then
+                  echo "Failed to create AcrPull role assignment after retries."
+                  exit 1
+                fi
+              fi
+
+              if [ "$existing_assignment_count" = "0" ]; then
+                for attempt in 1 2 3 4 5 6; do
+                  effective_assignment_count="$(az role assignment list \
+                    --assignee-object-id "$principal_id" \
+                    --scope "$acr_id" \
+                    --query "[?roleDefinitionName=='AcrPull'] | length(@)" \
+                    --output tsv)"
+
+                  if [ "$effective_assignment_count" != "0" ]; then
+                    break
+                  fi
+
+                  if [ "$attempt" -lt 6 ]; then
+                    sleep_seconds="$((attempt * 10))"
+                    echo "Waiting for AcrPull role assignment propagation (${attempt}/6), sleeping ${sleep_seconds}s..."
+                    sleep "$sleep_seconds"
+                  else
+                    echo "AcrPull role assignment did not propagate in time."
+                    exit 1
+                  fi
+                done
               fi
             fi
+
+            ghcr_registry_count="$(az containerapp registry list \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --query "[?server=='ghcr.io'] | length(@)" \
+              --output tsv)"
+
+            if [ "$ghcr_registry_count" != "0" ]; then
+              az containerapp registry remove \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --server ghcr.io || true
+            fi
+
+            ghcr_secret_count="$(az containerapp secret list \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --query "[?name=='ghcrio-jvaca92code'] | length(@)" \
+              --output tsv)"
+
+            if [ "$ghcr_secret_count" = "1" ]; then
+              az containerapp secret remove \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$app_name" \
+                --secret-names ghcrio-jvaca92code || true
+            fi
+
+            az containerapp secret set \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --secrets "smtp-user=$SMTP_USER" "smtp-pass=$SMTP_PASS"
+
+            az containerapp update \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --image "$IMAGE" \
+              --set-env-vars \
+                PORT=8080 \
+                SMTP_HOST="$SMTP_HOST" \
+                SMTP_PORT="$SMTP_PORT" \
+                SMTP_USER=secretref:smtp-user \
+                SMTP_PASS=secretref:smtp-pass \
+                MAIL_FROM="$MAIL_FROM" \
+                MAIL_TO="$MAIL_TO"
 
             default_fqdn="$(az containerapp show \
               --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -286,4 +353,175 @@ jobs:
               else
                 echo "Custom domain binding is not complete yet. Add/propagate the DNS records above, then rerun this workflow."
               fi
+            fi
+
+      - name: Configure Azure alerts
+        uses: azure/cli@v2
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          ALERT_EMAIL: jan.vaca@softbake.dev
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -euo pipefail
+
+            if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_LOCATION" ] || [ -z "$ALERT_EMAIL" ]; then
+              echo "AZURE_RESOURCE_GROUP, AZURE_LOCATION, and ALERT_EMAIL are required."
+              exit 1
+            fi
+
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az config set extension.dynamic_install_allow_preview=true
+
+            app_name="softbakedev"
+            workspace_name="softbakedev-law"
+            action_group_name="ag-softbakedev-prod"
+            action_group_short="softbakeops"
+            startup_alert_name="alert-softbakedev-startup-failures"
+            ingress_alert_name="alert-softbakedev-ingress-5xx"
+            activity_alert_name="alert-softbakedev-deploy-failures"
+
+            subscription_id="$(az account show --query id --output tsv)"
+            subscription_scope="/subscriptions/${subscription_id}"
+
+            app_resource_id="$(az containerapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$app_name" \
+              --query id \
+              --output tsv)"
+
+            workspace_resource_id="$(az monitor log-analytics workspace show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --workspace-name "$workspace_name" \
+              --query id \
+              --output tsv)"
+
+            if ! az monitor action-group show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$action_group_name" >/dev/null 2>&1; then
+              az monitor action-group create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$action_group_name" \
+                --short-name "$action_group_short" \
+                --action email primary "$ALERT_EMAIL" usecommonalertschema \
+                --output none
+            fi
+
+            has_alert_email="$(az monitor action-group show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$action_group_name" \
+              --query "contains(join(',', emailReceivers[].emailAddress), '${ALERT_EMAIL}')" \
+              --output tsv)"
+
+            if [ "$has_alert_email" != "true" ]; then
+              az monitor action-group update \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$action_group_name" \
+                --add-action email primary "$ALERT_EMAIL" usecommonalertschema \
+                --output none
+            fi
+
+            action_group_id="$(az monitor action-group show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$action_group_name" \
+              --query id \
+              --output tsv)"
+
+            startup_query="ContainerAppSystemLogs_CL | where TimeGenerated > ago(5m) | where tostring(ContainerAppName_s) == '${app_name}' | where tostring(Log_s) has_any ('ImagePullFailure','ErrImagePull','ImagePullBackOff','CrashLoopBackOff','Back-off restarting failed container','revision failed','Failed to pull image') or tostring(Reason_s) has_any ('ImagePullFailure','CrashLoopBackOff','ContainerCreateFailure')"
+
+            if az monitor scheduled-query show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$startup_alert_name" >/dev/null 2>&1; then
+              az monitor scheduled-query update \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$startup_alert_name" \
+                --condition "count 'StartupFailures' > 0" \
+                --condition-query StartupFailures="$startup_query" \
+                --severity 1 \
+                --window-size 5m \
+                --evaluation-frequency 5m \
+                --mute-actions-duration PT15M \
+                --action-groups "$action_group_id" \
+                --description "Container App startup/image pull failures detected for softbakedev." \
+                --skip-query-validation true \
+                --output none
+            else
+              az monitor scheduled-query create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --location "$AZURE_LOCATION" \
+                --name "$startup_alert_name" \
+                --scopes "$workspace_resource_id" \
+                --condition "count 'StartupFailures' > 0" \
+                --condition-query StartupFailures="$startup_query" \
+                --severity 1 \
+                --window-size 5m \
+                --evaluation-frequency 5m \
+                --mute-actions-duration PT15M \
+                --action-groups "$action_group_id" \
+                --description "Container App startup/image pull failures detected for softbakedev." \
+                --skip-query-validation true \
+                --output none
+            fi
+
+            ingress_query="AzureDiagnostics | where TimeGenerated > ago(5m) | where ResourceProvider == 'MICROSOFT.APP' | where Resource == '${app_name}' | where Category has 'Ingress' | extend statusCode = toint(coalesce(tostring(StatusCode), tostring(statusCode_s), tostring(ResponseCode_d), tostring(HttpStatusCode_d))) | where statusCode >= 500"
+
+            if az monitor scheduled-query show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$ingress_alert_name" >/dev/null 2>&1; then
+              az monitor scheduled-query update \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$ingress_alert_name" \
+                --condition "count 'Ingress5xx' > 5" \
+                --condition-query Ingress5xx="$ingress_query" \
+                --severity 1 \
+                --window-size 5m \
+                --evaluation-frequency 5m \
+                --mute-actions-duration PT15M \
+                --action-groups "$action_group_id" \
+                --description "Container App ingress 5xx spike detected for softbakedev." \
+                --skip-query-validation true \
+                --output none
+            else
+              az monitor scheduled-query create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --location "$AZURE_LOCATION" \
+                --name "$ingress_alert_name" \
+                --scopes "$workspace_resource_id" \
+                --condition "count 'Ingress5xx' > 5" \
+                --condition-query Ingress5xx="$ingress_query" \
+                --severity 1 \
+                --window-size 5m \
+                --evaluation-frequency 5m \
+                --mute-actions-duration PT15M \
+                --action-groups "$action_group_id" \
+                --description "Container App ingress 5xx spike detected for softbakedev." \
+                --skip-query-validation true \
+                --output none
+            fi
+
+            if az monitor activity-log alert show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$activity_alert_name" >/dev/null 2>&1; then
+              az monitor activity-log alert update \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$activity_alert_name" \
+                --condition "resourceType=MICROSOFT.APP/CONTAINERAPPS and status=Failed" \
+                --description "Failed Container Apps control-plane operations for softbakedev." \
+                --output none
+              az monitor activity-log alert action-group add \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$activity_alert_name" \
+                --reset true \
+                --action-group "$action_group_id" \
+                --output none
+            else
+              az monitor activity-log alert create \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --name "$activity_alert_name" \
+                --scope "$subscription_scope" \
+                --condition "resourceType=MICROSOFT.APP/CONTAINERAPPS and resourceId=${app_resource_id} and status=Failed" \
+                --description "Failed Container Apps control-plane operations for softbakedev." \
+                --action-group "$action_group_id" \
+                --output none
             fi
