@@ -102,6 +102,38 @@ jobs:
           inlineScript: |
             set -euo pipefail
 
+            run_with_containerapp_retry() {
+              local attempt status output sleep_seconds
+              for attempt in 1 2 3 4 5 6 7 8; do
+                set +e
+                output="$("$@" 2>&1)"
+                status=$?
+                set -e
+
+                if [ "$status" -eq 0 ]; then
+                  if [ -n "$output" ]; then
+                    printf '%s\n' "$output"
+                  fi
+                  return 0
+                fi
+
+                if printf '%s' "$output" | grep -q "ContainerAppOperationInProgress"; then
+                  if [ "$attempt" -lt 8 ]; then
+                    sleep_seconds="$((attempt * 15))"
+                    echo "Container App operation in progress; retry ${attempt}/8 in ${sleep_seconds}s..."
+                    sleep "$sleep_seconds"
+                    continue
+                  fi
+                fi
+
+                printf '%s\n' "$output"
+                return "$status"
+              done
+
+              printf '%s\n' "$output"
+              return 1
+            }
+
             if [ -z "$AZURE_RESOURCE_GROUP" ] || [ -z "$AZURE_LOCATION" ]; then
               echo "AZURE_RESOURCE_GROUP and AZURE_LOCATION variables are required."
               exit 1
@@ -193,7 +225,7 @@ jobs:
                   MAIL_FROM="$MAIL_FROM" \
                   MAIL_TO="$MAIL_TO"
             else
-              az containerapp identity assign \
+              run_with_containerapp_retry az containerapp identity assign \
                 --resource-group "$AZURE_RESOURCE_GROUP" \
                 --name "$app_name" \
                 --system-assigned \
@@ -282,7 +314,7 @@ jobs:
               fi
             fi
 
-            az containerapp registry set \
+            run_with_containerapp_retry az containerapp registry set \
               --resource-group "$AZURE_RESOURCE_GROUP" \
               --name "$app_name" \
               --server "$acr_login_server" \
@@ -314,12 +346,12 @@ jobs:
                 --secret-names ghcrio-jvaca92code || true
             fi
 
-            az containerapp secret set \
+            run_with_containerapp_retry az containerapp secret set \
               --resource-group "$AZURE_RESOURCE_GROUP" \
               --name "$app_name" \
               --secrets "smtp-user=$SMTP_USER" "smtp-pass=$SMTP_PASS"
 
-            az containerapp update \
+            run_with_containerapp_retry az containerapp update \
               --resource-group "$AZURE_RESOURCE_GROUP" \
               --name "$app_name" \
               --image "$IMAGE" \
