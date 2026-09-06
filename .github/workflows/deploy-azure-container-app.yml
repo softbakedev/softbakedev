@@ -511,6 +511,7 @@ jobs:
                 --severity 1 \
                 --window-size 5m \
                 --evaluation-frequency 5m \
+                --auto-mitigate false \
                 --mute-actions-duration PT15M \
                 --action-groups "$action_group_id" \
                 --description "Container App startup/image pull failures detected for softbakedev." \
@@ -527,6 +528,7 @@ jobs:
                 --severity 1 \
                 --window-size 5m \
                 --evaluation-frequency 5m \
+                --auto-mitigate false \
                 --mute-actions-duration PT15M \
                 --action-groups "$action_group_id" \
                 --description "Container App startup/image pull failures detected for softbakedev." \
@@ -547,6 +549,7 @@ jobs:
                 --severity 1 \
                 --window-size 5m \
                 --evaluation-frequency 5m \
+                --auto-mitigate false \
                 --mute-actions-duration PT15M \
                 --action-groups "$action_group_id" \
                 --description "Container App ingress 5xx spike detected for softbakedev." \
@@ -563,6 +566,7 @@ jobs:
                 --severity 1 \
                 --window-size 5m \
                 --evaluation-frequency 5m \
+                --auto-mitigate false \
                 --mute-actions-duration PT15M \
                 --action-groups "$action_group_id" \
                 --description "Container App ingress 5xx spike detected for softbakedev." \
