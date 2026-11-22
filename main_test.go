@@ -172,3 +172,36 @@ func TestContactRateLimit(t *testing.T) {
 		t.Fatalf("expected mailer to be called 5 times, got %d", mailer.calls)
 	}
 }
+
+func TestServesIconFilesWithCorrectContentTypes(t *testing.T) {
+	distDir := t.TempDir()
+	files := map[string]string{
+		"index.html":       "<!doctype html>",
+		"favicon.ico":      "\x00\x00\x01\x00icon",
+		"site.webmanifest": `{"name":"softbake.dev"}`,
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(distDir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	server := newServer(distDir, &recordingMailer{})
+
+	cases := map[string]string{
+		"/favicon.ico":      "image/x-icon",
+		"/site.webmanifest": "application/manifest+json",
+	}
+	for path, wantType := range cases {
+		recorder := httptest.NewRecorder()
+		server.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200 OK, got %d", path, recorder.Code)
+		}
+		if got := recorder.Header().Get("Content-Type"); !strings.HasPrefix(got, wantType) {
+			t.Fatalf("%s: expected content type %q, got %q", path, wantType, got)
+		}
+		if strings.Contains(recorder.Body.String(), "<!doctype html>") {
+			t.Fatalf("%s: got the SPA index page instead of the icon file", path)
+		}
+	}
+}
