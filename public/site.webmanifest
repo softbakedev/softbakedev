@@ -1,0 +1,14 @@
+{
+  "name": "softbake.dev",
+  "short_name": "softbake",
+  "description": "We bake software: designed first, built by baker agents, checked by a human master chief.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF6EE",
+  "theme_color": "#FF8A4C",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
