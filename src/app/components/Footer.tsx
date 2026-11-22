@@ -1,9 +1,11 @@
-import { Github, Linkedin, Twitter, Mail } from 'lucide-react';
+import { Github, Mail } from 'lucide-react';
 import { Link } from 'react-router';
-
-const logo = new URL('../../assets/favicon-192.png', import.meta.url).href;
+import { VelocityTape } from './sticker/VelocityTape';
+import { Logo } from './sticker/Logo';
+import { useCookieConsent } from './CookieConsent';
 
 export function Footer() {
+  const { openSettings } = useCookieConsent();
   const currentYear = new Date().getFullYear();
 
   const footerLinks = {
@@ -27,8 +29,6 @@ export function Footer() {
 
   const socialLinks = [
     { icon: Github, href: 'https://github.com/softbakedev', label: 'GitHub' },
-    { icon: Linkedin, href: '#', label: 'LinkedIn' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
     { icon: Mail, href: 'mailto:info@softbake.dev', label: 'Email' },
   ];
 
@@ -50,112 +50,82 @@ export function Footer() {
     }
   };
 
-  return (
-    <footer className="relative overflow-hidden bg-gradient-to-b from-white via-orange-50/35 to-white text-gray-700">
-      <div className="absolute left-[-10rem] top-10 h-72 w-72 rounded-full bg-orange-200/30 blur-3xl" aria-hidden />
-      <div className="absolute right-[-10rem] bottom-10 h-72 w-72 rounded-full bg-pink-200/30 blur-3xl" aria-hidden />
+  const columns = [
+    { title: 'Company', links: footerLinks.company },
+    { title: 'Services', links: footerLinks.services },
+    { title: 'Resources', links: footerLinks.resources },
+  ];
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="mb-12 rounded-[2rem] border border-orange-100/80 bg-white/90 p-6 shadow-[0_25px_80px_rgba(251,146,60,0.14)] backdrop-blur sm:p-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
-          {/* Brand */}
+  return (
+    <footer className="relative overflow-hidden bg-[var(--sb-ink)] text-white">
+      <VelocityTape
+        items={['Freshly baked software', 'Human checked', 'Agent built', 'Design first']}
+        separator="✺"
+        className="sb-display border-b-[3px] border-[var(--sb-ink)] bg-[var(--sb-yellow)] py-3 text-lg text-[var(--sb-ink)]"
+      />
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-4 mb-4">
-              <img src={logo} alt="softbake.dev" className="h-14 w-14 object-contain" />
-              <span className="bg-gradient-to-r from-orange-500 to-pink-600 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-                softbake.dev
-              </span>
+            <div className="mb-5 flex items-center gap-4">
+              <Logo className="h-16 w-16" title="" />
+              <span className="sb-display text-4xl text-[var(--sb-orange)]">softbake.dev</span>
             </div>
-            <p className="text-gray-600 mb-6 leading-relaxed">
+            <p className="mb-6 max-w-md font-medium leading-relaxed text-white/75">
               We design products, plan the timeline, and let our baker agents build them. A human master chief always
               reviews and tests the work, so what we ship just works.
             </p>
-            {/* Social Links */}
-            <div className="flex space-x-4">
-              {socialLinks.map((social, index) => {
+            <div className="flex gap-3">
+              {socialLinks.map((social) => {
                 const Icon = social.icon;
                 return (
                   <a
-                    key={index}
+                    key={social.label}
                     href={social.href}
                     aria-label={social.label}
-                    className="w-10 h-10 rounded-xl border border-orange-100 bg-orange-50/70 text-orange-600 flex items-center justify-center hover:bg-gradient-to-br hover:from-orange-500 hover:to-pink-600 hover:text-white transition-all duration-300"
+                    className="sb-focus grid h-11 w-11 place-items-center rounded-xl border-[2.5px] border-white bg-[var(--sb-ink)] text-white shadow-[3px_3px_0_var(--sb-orange)] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-[var(--sb-orange)] hover:text-[var(--sb-ink)]"
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="h-5 w-5" />
                   </a>
                 );
               })}
             </div>
           </div>
 
-          {/* Links */}
-          <div>
-            <h3 className="text-gray-950 font-semibold mb-4">Company</h3>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link, index) => (
-                <li key={index}>
-                  <button
-                    onClick={() => scrollToSection(link.href)}
-                    className="text-left text-gray-600 hover:text-orange-600 transition-colors"
-                  >
-                    {link.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-gray-950 font-semibold mb-4">Services</h3>
-            <ul className="space-y-3">
-              {footerLinks.services.map((link, index) => (
-                <li key={index}>
-                  <button
-                    onClick={() => scrollToSection(link.href)}
-                    className="text-left text-gray-600 hover:text-orange-600 transition-colors"
-                  >
-                    {link.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-gray-950 font-semibold mb-4">Resources</h3>
-            <ul className="space-y-3">
-              {footerLinks.resources.map((link, index) => (
-                <li key={index}>
-                  <button
-                    onClick={() => scrollToSection(link.href)}
-                    className="text-left text-gray-600 hover:text-orange-600 transition-colors"
-                  >
-                    {link.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-orange-100">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p className="text-sm text-gray-500">
-              © {currentYear} softbake.dev. All rights reserved. Baked with care.
-            </p>
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
-              <Link to="/privacy-policy" className="text-gray-500 hover:text-orange-600 transition-colors">
-                Privacy Policy
-              </Link>
-              <Link to="/terms-of-service" className="text-gray-500 hover:text-orange-600 transition-colors">
-                Terms of Service
-              </Link>
-              <Link to="/cookie-policy" className="text-gray-500 hover:text-orange-600 transition-colors">
-                Cookie Policy
-              </Link>
+          {columns.map((column) => (
+            <div key={column.title}>
+              <h3 className="sb-display mb-4 text-lg text-[var(--sb-yellow)]">{column.title}</h3>
+              <ul className="space-y-3">
+                {column.links.map((link) => (
+                  <li key={link.label}>
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection(link.href)}
+                      className="sb-focus text-left font-medium text-white/80 transition hover:translate-x-1 hover:text-[var(--sb-orange)]"
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
+          ))}
+        </div>
+
+        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t-[2.5px] border-dashed border-white/30 pt-8 md:flex-row">
+          <p className="text-sm text-white/60">© {currentYear} softbake.dev. All rights reserved. Baked with care.</p>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+            <Link to="/privacy-policy" className="text-white/60 transition-colors hover:text-[var(--sb-orange)]">
+              Privacy Policy
+            </Link>
+            <Link to="/terms-of-service" className="text-white/60 transition-colors hover:text-[var(--sb-orange)]">
+              Terms of Service
+            </Link>
+            <Link to="/cookie-policy" className="text-white/60 transition-colors hover:text-[var(--sb-orange)]">
+              Cookie Policy
+            </Link>
+            <button type="button" onClick={openSettings} className="sb-focus text-white/60 underline decoration-dotted underline-offset-4 transition-colors hover:text-[var(--sb-orange)]">
+              Cookie settings
+            </button>
           </div>
         </div>
       </div>

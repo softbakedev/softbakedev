@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { Services } from './components/Services';
@@ -11,6 +11,16 @@ import { Footer } from './components/Footer';
 import { LegalPage } from './components/LegalPage';
 import { RecipeArchivePage } from './components/RecipeArchivePage';
 import { RecipePage } from './components/RecipePage';
+import { CookieConsentProvider } from './components/CookieConsent';
+
+/** Open every new page at the top instead of keeping the previous page's scroll position. */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 function HomePage() {
   return (
@@ -27,18 +37,21 @@ function HomePage() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white">
-      <Header />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/recipes" element={<RecipeArchivePage />} />
-        <Route path="/recipes/:slug" element={<RecipePage />} />
-        <Route path="/privacy-policy" element={<LegalPage kind="privacy" />} />
-        <Route path="/terms-of-service" element={<LegalPage kind="terms" />} />
-        <Route path="/cookie-policy" element={<LegalPage kind="cookies" />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <Footer />
-    </div>
+    <CookieConsentProvider>
+      <div className="min-h-screen bg-[var(--sb-paper)]">
+        <ScrollToTop />
+        <Header />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/recipes" element={<RecipeArchivePage />} />
+          <Route path="/recipes/:slug" element={<RecipePage />} />
+          <Route path="/privacy-policy" element={<LegalPage kind="privacy" />} />
+          <Route path="/terms-of-service" element={<LegalPage kind="terms" />} />
+          <Route path="/cookie-policy" element={<LegalPage kind="cookies" />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <Footer />
+      </div>
+    </CookieConsentProvider>
   );
 }

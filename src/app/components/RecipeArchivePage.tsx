@@ -1,65 +1,89 @@
 import React from 'react';
-import { Search } from 'lucide-react';
-import { motion } from 'motion/react';
+import { BookOpen, Search } from 'lucide-react';
 import { recipes } from '../data/recipes';
 import { RecipeCard } from './RecipeCard';
+import { PageShell } from './sticker/PageShell';
 
 function searchableText(recipe: (typeof recipes)[number]) {
-  return [
-    recipe.title,
-    recipe.category,
-    recipe.description,
-    recipe.readTime,
-    recipe.markdown,
-  ].join(' ').toLowerCase();
+  return [recipe.title, recipe.category, recipe.description, recipe.readTime, recipe.markdown].join(' ').toLowerCase();
 }
 
 export function RecipeArchivePage() {
   const [query, setQuery] = React.useState('');
+  const [category, setCategory] = React.useState<string | null>(null);
+  const categories = React.useMemo(() => [...new Set(recipes.map((r) => r.category))].sort(), []);
+
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredRecipes = normalizedQuery
-    ? recipes.filter((recipe) => searchableText(recipe).includes(normalizedQuery))
-    : recipes;
+  const filteredRecipes = recipes.filter(
+    (recipe) =>
+      (!category || recipe.category === category) && (!normalizedQuery || searchableText(recipe).includes(normalizedQuery)),
+  );
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-white via-orange-50/35 to-white pb-24 pt-32">
-      <div className="absolute left-[-12rem] top-24 h-80 w-80 rounded-full bg-orange-200/30 blur-3xl" aria-hidden />
-      <div className="absolute right-[-10rem] bottom-16 h-72 w-72 rounded-full bg-pink-200/30 blur-3xl" aria-hidden />
-
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
-          className="mb-10"
-        >
+    <PageShell
+      chip={
+        <>
+          <BookOpen className="h-4 w-4" />
+          Recipe blog
+        </>
+      }
+      title="All recipes"
+      band="var(--sb-pink)"
+      width="wide"
+      intro="Notes from our digital bakery: practical recipes about product design, sprint planning, baker agents, testing and delivery."
+      bandExtra={
+        <div className="grid max-w-3xl gap-4">
           <label htmlFor="recipe-search" className="sr-only">
             Search recipes
           </label>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-orange-500" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2" />
             <input
               id="recipe-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by title, category, or article content..."
-              className="w-full rounded-2xl border border-orange-100 bg-orange-50/30 py-4 pl-12 pr-4 text-gray-900 outline-none transition focus:border-orange-300 focus:ring-2 focus:ring-orange-200"
+              placeholder="Search by title, category or article content…"
+              className="sb-input !bg-white py-4 pl-12"
             />
           </div>
-        </motion.div>
+          {categories.length > 1 ? (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
+              {[null, ...categories].map((c) => (
+                <button
+                  key={c ?? 'all'}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  aria-pressed={category === c}
+                  className={`sb-chip sb-focus text-xs transition-transform hover:-translate-y-0.5 ${category === c ? '!bg-[var(--sb-ink)] text-white' : ''}`}
+                >
+                  {c ?? 'All'}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      }
+    >
+      <p className="mb-8 text-sm font-bold uppercase tracking-[0.12em]" aria-live="polite">
+        {filteredRecipes.length} {filteredRecipes.length === 1 ? 'recipe' : 'recipes'}
+      </p>
 
-        {filteredRecipes.length > 0 ? (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredRecipes.map((recipe, index) => (
-              <RecipeCard key={recipe.slug} recipe={recipe} index={index} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-[2rem] border border-orange-100/80 bg-white/90 p-8 text-center text-gray-600 shadow-[0_20px_60px_rgba(251,146,60,0.12)]">
-            No recipes found. Try a different word from the kitchen.
-          </div>
-        )}
-      </div>
-    </main>
+      {filteredRecipes.length > 0 ? (
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
+          {filteredRecipes.map((recipe, index) => (
+            <RecipeCard key={recipe.slug} recipe={recipe} index={index} />
+          ))}
+        </div>
+      ) : (
+        <div className="sb-card mx-auto max-w-xl rotate-[-1deg] bg-white p-8 text-center">
+          <p className="sb-display text-2xl">Nothing in the oven</p>
+          <p className="mt-3 font-medium text-[#3a332f]">
+            {recipes.length === 0
+              ? 'The first recipes are still baking. Check back soon.'
+              : 'No recipe matches that search. Try a different word from the kitchen.'}
+          </p>
+        </div>
+      )}
+    </PageShell>
   );
 }

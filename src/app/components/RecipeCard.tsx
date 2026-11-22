@@ -1,47 +1,49 @@
-import { Clock } from 'lucide-react';
+import React from 'react';
+import { ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router';
 import type { Recipe } from '../data/recipes';
+import { OvenTimer } from './sticker/OvenTimer';
 
-const accents = [
-  'from-orange-500 to-amber-500',
-  'from-pink-500 to-rose-500',
-  'from-rose-500 to-pink-600',
-];
+const tagColors = ['var(--sb-yellow)', 'var(--sb-sky)', 'var(--sb-mint)'];
+const tilts = [-1.5, 1, -0.75];
+
+const MotionLink = motion.create(Link);
 
 export function RecipeCard({ recipe, index }: { recipe: Recipe; index: number }) {
   const categoryLabel = recipe.kind === 'planned' ? `${recipe.category} · Planned` : recipe.category;
+  const tilt = tilts[index % tilts.length];
+  const [baking, setBaking] = React.useState(false);
 
   return (
-    <motion.div
-      key={recipe.title}
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+    <MotionLink
+      to={`/recipes/${recipe.slug}`}
+      initial={{ opacity: 0, y: 40, rotate: tilt * 3 }}
+      whileInView={{ opacity: 1, y: 0, rotate: tilt }}
+      whileHover={{ rotate: 0, y: -6 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: Math.min(index, 5) * 0.08 }}
+      transition={{ type: 'spring', stiffness: 220, damping: 16, delay: Math.min(index, 5) * 0.08 }}
+      onHoverStart={() => setBaking(true)}
+      onHoverEnd={() => setBaking(false)}
+      onFocus={() => setBaking(true)}
+      onBlur={() => setBaking(false)}
+      className="sb-card sb-focus group flex h-full flex-col p-6 sm:p-7"
     >
-      <Link
-        to={`/recipes/${recipe.slug}`}
-        className="group relative flex h-full flex-col overflow-hidden rounded-[2rem] border border-orange-100/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(251,146,60,0.12)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-pink-200 hover:shadow-[0_28px_80px_rgba(190,18,60,0.14)] focus:outline-none focus:ring-2 focus:ring-orange-300 focus:ring-offset-2 sm:p-7"
-      >
-        <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accents[index % accents.length]}`} aria-hidden />
-        <p className="mb-3 mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
-          {categoryLabel}
-        </p>
-        <h3 className="mb-3 text-2xl font-bold leading-tight text-gray-950">
-          {recipe.title}
-        </h3>
-        <p className="mb-6 flex-1 text-sm leading-relaxed text-gray-600 sm:text-base">
-          {recipe.description}
-        </p>
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-orange-100 pt-4 text-sm text-gray-500">
-          <span>{recipe.kind === 'planned' ? 'Preview planned recipe' : 'Open recipe'}</span>
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-4 w-4" />
-            {recipe.readTime}
-          </span>
-        </div>
-      </Link>
-    </motion.div>
+      <span className="sb-chip mb-4 self-start text-xs" style={{ background: tagColors[index % tagColors.length] }}>
+        {categoryLabel}
+      </span>
+      <h3 className="sb-display mb-3 text-2xl leading-none">{recipe.title}</h3>
+      <p className="mb-6 flex-1 text-sm font-medium leading-relaxed text-[#3a332f] sm:text-base">{recipe.description}</p>
+      <div className="mt-auto flex items-end justify-between gap-3 border-t-[2.5px] border-dashed border-[var(--sb-ink)] pt-4 text-sm font-bold">
+        <span className="inline-flex items-center gap-1 pb-1">
+          {recipe.kind === 'planned' ? 'Preview planned recipe' : 'Open recipe'}
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        </span>
+        <span className="flex flex-col items-center gap-1">
+          <OvenTimer readTime={recipe.readTime} running={baking} className="w-28" />
+          <span className="text-xs font-bold">{recipe.readTime}</span>
+        </span>
+      </div>
+    </MotionLink>
   );
 }

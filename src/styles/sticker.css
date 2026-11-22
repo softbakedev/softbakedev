@@ -1,0 +1,141 @@
+/* Sticker Shop design system: playful neo-brutalism.
+   Thick ink outlines, hard offset shadows, paper grid, spring motion. */
+:root {
+  --sb-ink: #111111;
+  --sb-orange: #ff8a4c;
+  --sb-paper: #fff6ee;
+  --sb-yellow: #ffe14d;
+  --sb-sky: #b9f2ff;
+  --sb-pink: #ffb3d1;
+  --sb-mint: #a7f3c5;
+  --sb-font-display: 'Bowlby One', 'Arial Black', Impact, sans-serif;
+  --sb-font-body: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@layer base {
+body {
+  font-family: var(--sb-font-body);
+  color: var(--sb-ink);
+  background: var(--sb-paper);
+}
+
+}
+
+@layer components {
+.sb-display {
+  font-family: var(--sb-font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.9;
+}
+
+.sb-grid-bg {
+  background-image:
+    linear-gradient(rgba(17, 17, 17, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.sb-card {
+  border: 2.5px solid var(--sb-ink);
+  border-radius: 18px;
+  box-shadow: 5px 5px 0 var(--sb-ink);
+  background: #fff;
+}
+
+.sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 2.5px solid var(--sb-ink);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: #fff;
+  box-shadow: 3px 3px 0 var(--sb-ink);
+}
+
+.sb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  border: 2.5px solid var(--sb-ink);
+  border-radius: 14px;
+  padding: 0.85rem 1.35rem;
+  background: var(--sb-ink);
+  color: #fff;
+  box-shadow: 5px 5px 0 #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.15s;
+}
+.sb-btn:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 #fff; }
+.sb-btn:active { transform: translate(5px, 5px); box-shadow: 0 0 0 #fff; }
+.sb-btn:disabled { opacity: 0.6; cursor: progress; }
+.sb-btn--light { background: #fff; color: var(--sb-ink); box-shadow: 5px 5px 0 var(--sb-ink); }
+.sb-btn--light:hover { box-shadow: 7px 7px 0 var(--sb-ink); }
+.sb-btn--light:active { box-shadow: 0 0 0 var(--sb-ink); }
+/* Flat black button (no offset shadow), for buttons that sit on white cards and bars. */
+.sb-btn--flat { box-shadow: none; }
+.sb-btn--flat:hover { box-shadow: none; transform: translateY(-1px); background: #2a2523; }
+.sb-btn--flat:active { box-shadow: none; transform: translateY(1px); }
+
+.sb-btn:focus-visible,
+.sb-chip:focus-visible,
+.sb-focus:focus-visible {
+  outline: 3px solid var(--sb-ink);
+  outline-offset: 3px;
+}
+
+.sb-input {
+  width: 100%;
+  border: 2.5px solid var(--sb-ink);
+  border-radius: 12px;
+  background: var(--sb-paper);
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  color: var(--sb-ink);
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.sb-input::placeholder { color: #8a7f78; }
+.sb-input:focus { outline: none; box-shadow: 4px 4px 0 var(--sb-ink); transform: translate(-2px, -2px); background: #fff; }
+
+}
+
+/* Marquee tape */
+.sb-tape { overflow: hidden; white-space: nowrap; }
+.sb-tape__track { display: inline-flex; animation: sb-marquee 26s linear infinite; }
+.sb-tape--reverse .sb-tape__track { animation-direction: reverse; }
+@keyframes sb-marquee { to { transform: translateX(-50%); } }
+
+/* Idle wobble for stickers */
+.sb-wobble { animation: sb-wobble 3.2s ease-in-out infinite; }
+@keyframes sb-wobble {
+  0%, 100% { rotate: var(--sb-r, -6deg); }
+  50% { rotate: calc(var(--sb-r, -6deg) + 6deg); }
+}
+
+
+/* Baked goods card illustrations: small idle loops */
+.ga-bob { transform-box: fill-box; transform-origin: 50% 100%; animation: ga-bob 2.4s ease-in-out infinite; }
+@keyframes ga-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-5px) rotate(-4deg); } }
+.ga-twinkle { transform-box: fill-box; transform-origin: 50% 50%; animation: ga-twinkle 2.2s ease-in-out infinite; }
+@keyframes ga-twinkle { 0%, 100% { transform: scale(.7) rotate(0); } 50% { transform: scale(1.15) rotate(20deg); } }
+.ga-pop { transform-box: view-box; animation: ga-pop 4s cubic-bezier(.2, 1.8, .4, 1) infinite both; }
+@keyframes ga-pop { 0%, 6% { transform: scale(0); } 16%, 90% { transform: scale(1); } 100% { transform: scale(0); } }
+.ga-scan { animation: ga-scan 2.2s ease-in-out infinite alternate; }
+@keyframes ga-scan { from { transform: translateY(0); } to { transform: translateY(80px); } }
+.ga-flow { animation: ga-flow 1s linear infinite; }
+@keyframes ga-flow { to { stroke-dashoffset: -24; } }
+.ga-blink { animation: ga-blink 1.4s steps(2) infinite; }
+@keyframes ga-blink { 50% { opacity: .2; } }
+.ga-ride { offset-path: path('M40 132 H300 Q324 132 324 108 V80'); offset-rotate: 0deg; animation: ga-ride 4.5s cubic-bezier(.6, 0, .4, 1) infinite; }
+@keyframes ga-ride { 0% { offset-distance: 0%; opacity: 0; } 8% { opacity: 1; } 88% { offset-distance: 100%; opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-tape__track, .sb-wobble, .ga-bob, .ga-twinkle, .ga-pop, .ga-scan, .ga-flow, .ga-blink, .ga-ride { animation: none; }
+  .sb-btn, .sb-input { transition: none; }
+}
