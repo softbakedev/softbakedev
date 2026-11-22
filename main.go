@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime"
 	"net"
 	"net/http"
 	"net/mail"
@@ -51,6 +52,13 @@ type rateLimiter struct {
 type rateLimitEntry struct {
 	count       int
 	windowStart time.Time
+}
+
+// Content types for icon files the Go standard library does not know, so browsers
+// read the web app manifest and favicon correctly.
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+	_ = mime.AddExtensionType(".ico", "image/x-icon")
 }
 
 func main() {
