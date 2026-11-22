@@ -1,21 +1,79 @@
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Button } from './ui/button';
+import {
+  motion,
+  AnimatePresence,
+  useMotionValueEvent,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+  useVelocity,
+} from 'motion/react';
+import { Logo } from './sticker/Logo';
 
-const logo = new URL('../../assets/favicon-192.png', import.meta.url).href;
+const navItems = [
+  { label: 'How we bake', id: 'services' },
+  { label: 'Goods', id: 'projects' },
+  { label: 'Bakery', id: 'about' },
+  { label: 'Recipes', id: 'recipes' },
+  { label: 'Contact', id: 'contact' },
+];
 
-export function Header() {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+/** Returns the id of the homepage section currently in the middle of the viewport. */
+function useActiveSection(ids: string[]) {
+  const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+    let observer: IntersectionObserver | null = null;
+    const connect = () => {
+      observer?.disconnect();
+      const elements = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => Boolean(el));
+      if (elements.length === 0) {
+        setActive(null);
+        return;
+      }
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) setActive(entry.target.id);
+          });
+        },
+        { rootMargin: '-45% 0px -50% 0px' },
+      );
+      elements.forEach((el) => observer?.observe(el));
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+
+    connect();
+    const onTop = () => {
+      if (window.scrollY < 200) setActive(null);
+    };
+    window.addEventListener('scroll', onTop, { passive: true });
+    window.addEventListener('hashchange', connect);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('scroll', onTop);
+      window.removeEventListener('hashchange', connect);
+    };
+  }, [ids]);
+
+  return active;
+}
+
+const sectionIds = navItems.map((item) => item.id);
+
+export function Header() {
+  const reduce = useReducedMotion();
+  const [isCompact, setIsCompact] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const activeSection = useActiveSection(sectionIds);
+
+  // Header shrinks after the first scroll; the logo's hat tips with scroll speed.
+  const { scrollY } = useScroll();
+  const scrollVelocity = useVelocity(scrollY);
+  const hatTiltRaw = useTransform(scrollVelocity, [-2500, 0, 2500], [22, 0, -22], { clamp: true });
+  const hatTilt = useSpring(hatTiltRaw, { stiffness: 260, damping: 14 });
+  useMotionValueEvent(scrollY, 'change', (y) => setIsCompact(y > 40));
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -37,113 +95,117 @@ export function Header() {
     setMobileMenuOpen(false);
   };
 
-  const navItems = [
-    { label: 'How we bake', id: 'services' },
-    { label: 'Goods', id: 'projects' },
-    { label: 'Bakery', id: 'about' },
-    { label: 'Recipes', id: 'recipes' },
-    { label: 'Contact', id: 'contact' },
-  ];
+  const spring = { type: 'spring' as const, stiffness: 320, damping: 28 };
 
   return (
     <motion.header
-      initial={{ y: -100 }}
+      initial={reduce ? false : { y: -120 }}
       animate={{ y: 0 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white/95 backdrop-blur-md shadow-lg' : 'bg-transparent'
-      }`}
+      transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+      className="fixed inset-x-0 top-0 z-50 px-3 sm:px-5"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="min-h-[3.5rem] sm:min-h-16 py-3 sm:py-3.5">
-          {/* Mobile: brand + menu */}
-          <div className="flex md:hidden w-full items-center justify-between gap-4">
-            <div className="min-w-0">
-              <button
-                type="button"
-                aria-label="Home"
-                title="Home"
-                onClick={goHome}
-                className="cursor-pointer rounded-lg -ml-1 px-1 py-0.5 sm:px-1.5"
-              >
-                <img src={logo} alt="softbake.dev" className="h-11 w-11 object-contain sm:h-12 sm:w-12" />
-              </button>
-            </div>
-            <button
-              type="button"
-              className="shrink-0 -mr-1 p-2.5 text-gray-800 hover:text-orange-600 transition-colors rounded-lg hover:bg-white/50"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-expanded={mobileMenuOpen}
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
+      <motion.div
+        animate={{
+          marginTop: isCompact ? 8 : 16,
+          paddingTop: isCompact ? 4 : 8,
+          paddingBottom: isCompact ? 4 : 8,
+          maxWidth: isCompact ? 1120 : 1280,
+        }}
+        transition={reduce ? { duration: 0 } : spring}
+        className={`mx-auto flex items-center justify-between gap-4 rounded-2xl border-[2.5px] border-[var(--sb-ink)] bg-white px-3 transition-shadow duration-200 sm:px-4 ${
+          isCompact ? 'shadow-[5px_5px_0_var(--sb-ink)]' : 'shadow-[3px_3px_0_var(--sb-ink)]'
+        }`}
+      >
+        <button
+          type="button"
+          aria-label="Home"
+          title="Home"
+          onClick={goHome}
+          className="sb-focus flex items-center gap-2 rounded-xl"
+        >
+          <motion.span
+            className="block"
+            animate={{ width: isCompact ? 40 : 54, height: isCompact ? 40 : 54 }}
+            transition={reduce ? { duration: 0 } : spring}
+          >
+            <Logo className="h-full w-full" title="" hatTilt={reduce ? undefined : hatTilt} />
+          </motion.span>
+          <span className="sb-display hidden -rotate-2 rounded-md border-[2.5px] border-[var(--sb-ink)] bg-[var(--sb-yellow)] px-2 pb-0.5 pt-1 text-base shadow-[3px_3px_0_var(--sb-ink)] sm:inline-block">
+            softbake
+          </span>
+        </button>
 
-          {/* Desktop: brand | centered nav | CTA */}
-          <div className="hidden md:grid w-full grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-4 lg:gap-6">
-            <div className="min-w-0 justify-self-start">
+        <nav className="hidden items-center gap-1 md:flex lg:gap-2" aria-label="Main">
+          {navItems.map((item) => {
+            const isActive = activeSection === item.id;
+            return (
               <button
+                key={item.id}
                 type="button"
-                aria-label="Home"
-                title="Home"
-                onClick={goHome}
-                className="cursor-pointer rounded-lg px-1 py-0.5 sm:px-1.5"
+                onClick={() => scrollToSection(item.id)}
+                aria-current={isActive ? 'true' : undefined}
+                className="sb-focus group relative whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-bold"
               >
-                <img src={logo} alt="softbake.dev" className="h-12 w-12 object-contain lg:h-14 lg:w-14" />
+                {isActive ? (
+                  <motion.span
+                    layoutId="nav-pill"
+                    className="absolute inset-0 rounded-full border-[2.5px] border-[var(--sb-ink)] bg-[var(--sb-yellow)] shadow-[2px_2px_0_var(--sb-ink)]"
+                    transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 26 }}
+                  />
+                ) : (
+                  <span className="absolute inset-0 rounded-full border-[2.5px] border-transparent transition-colors group-hover:border-[var(--sb-ink)] group-hover:bg-[var(--sb-sky)]" />
+                )}
+                <span className="relative">{item.label}</span>
               </button>
-            </div>
-            <nav
-              className="flex min-w-0 items-center justify-center gap-3 lg:gap-4 xl:gap-6"
-              aria-label="Main"
-            >
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => scrollToSection('contact')}
+            className="sb-btn sb-btn--flat hidden !px-4 !py-2 text-sm md:inline-flex"
+          >
+            Order now
+          </button>
+          <button
+            type="button"
+            className="sb-focus rounded-xl border-[2.5px] border-[var(--sb-ink)] bg-[var(--sb-yellow)] p-2 md:hidden"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -12, rotate: -2, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, rotate: 2, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 24 }}
+            className="sb-card mx-auto mt-3 max-w-7xl p-4 md:hidden"
+          >
+            <div className="grid gap-2">
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => scrollToSection(item.id)}
-                  className="whitespace-nowrap text-sm lg:text-[0.95rem] text-gray-800 hover:text-orange-600 transition-colors font-medium px-0.5 py-1"
+                  className={`sb-focus rounded-xl border-[2.5px] border-[var(--sb-ink)] px-4 py-2.5 text-left font-bold hover:bg-[var(--sb-sky)] ${
+                    activeSection === item.id ? 'bg-[var(--sb-yellow)]' : ''
+                  }`}
                 >
                   {item.label}
                 </button>
               ))}
-            </nav>
-            <div className="justify-self-end">
-              <Button
-                onClick={() => scrollToSection('contact')}
-                className="shrink-0 bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700"
-              >
-                Order Now
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t"
-          >
-            <div className="px-4 py-6 space-y-4">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => scrollToSection(item.id)}
-                  className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  {item.label}
-                </button>
-              ))}
-              <Button
-                onClick={() => scrollToSection('contact')}
-                className="w-full bg-gradient-to-r from-orange-500 to-pink-600"
-              >
-                Order Now
-              </Button>
+              <button type="button" onClick={() => scrollToSection('contact')} className="sb-btn sb-btn--flat mt-2 w-full">
+                Order now
+              </button>
             </div>
           </motion.div>
         )}

@@ -1,9 +1,56 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Building2, FileText, Mail, MapPin, Send } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
+import { SectionHeading } from './sticker/SectionHeading';
+
+const infoCards = [
+  {
+    icon: Mail,
+    title: 'Email us',
+    color: 'var(--sb-yellow)',
+    body: (
+      <a href="mailto:info@softbake.dev" className="font-medium underline decoration-2 underline-offset-4 hover:bg-[var(--sb-yellow)]">
+        info@softbake.dev
+      </a>
+    ),
+  },
+  {
+    icon: Building2,
+    title: 'Company',
+    color: 'var(--sb-sky)',
+    body: (
+      <>
+        SoftBake s.r.o.
+        <br />
+        IČO: 17856566
+      </>
+    ),
+  },
+  {
+    icon: FileText,
+    title: 'Registry',
+    color: 'var(--sb-pink)',
+    body: (
+      <>
+        C 377904/MSPH
+        <br />
+        Incorporated 21. 12. 2022
+      </>
+    ),
+  },
+  {
+    icon: MapPin,
+    title: 'Registered office',
+    color: 'var(--sb-mint)',
+    body: (
+      <>
+        Štorkánova 3236/16, Smíchov
+        <br />
+        150 00 Praha 5, Czech Republic
+      </>
+    ),
+  },
+];
 
 export function Contact() {
   const [formData, setFormData] = useState({
@@ -52,219 +99,121 @@ export function Contact() {
     }
   };
 
+  const labelClass = 'mb-2 block text-sm font-bold';
+
   return (
-    <section id="contact" className="relative overflow-hidden bg-gradient-to-b from-white via-orange-50/35 to-white py-24">
-      <div className="absolute left-[-12rem] top-20 h-80 w-80 rounded-full bg-orange-200/30 blur-3xl" aria-hidden />
-      <div className="absolute right-[-10rem] bottom-16 h-72 w-72 rounded-full bg-pink-200/30 blur-3xl" aria-hidden />
+    <section
+      id="contact"
+      className="sb-grid-bg relative overflow-hidden border-b-[3px] border-[var(--sb-ink)] bg-[var(--sb-orange)] py-20 sm:py-28"
+    >
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <SectionHeading chip="Start your recipe" chipColor="#fff" title="Place your" highlight="order" highlightColor="var(--sb-yellow)">
+          Tell us about your product idea. We will reply with a clear plan and timeline, and show you how we would bake it.
+        </SectionHeading>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="relative z-10 text-center mb-16"
-        >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-100 bg-white/80 px-3 py-1 text-xs font-semibold text-orange-600 shadow-sm">
-            Start your recipe
-          </div>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Place Your{' '}
-            <span className="bg-gradient-to-r from-orange-500 to-pink-600 bg-clip-text text-transparent">
-              Order
-            </span>
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Tell us about your product idea. We will reply with a clear plan and timeline, and show you how we would bake it.
-          </p>
-        </motion.div>
-
-        <div className="relative z-10 grid grid-cols-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12">
-          {/* Contact Form */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+        <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 40, rotate: -2 }}
+            whileInView={{ opacity: 1, y: 0, rotate: -0.75 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="relative h-full"
+            transition={{ type: 'spring', stiffness: 160, damping: 16 }}
+            className="sb-card flex flex-col gap-5 p-6 sm:p-8"
           >
-            <div className="pointer-events-none absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-orange-200/40 to-pink-200/40 blur-2xl" />
-            <form
-              onSubmit={handleSubmit}
-              className="flex h-full flex-col rounded-[2rem] border border-orange-100/80 bg-white/90 p-6 shadow-[0_25px_80px_rgba(251,146,60,0.14)] backdrop-blur sm:p-8"
-            >
-              <div className="mb-7">
-                <h3 className="text-2xl font-bold text-gray-950">Tell us what to bake</h3>
-                <p className="mt-2 text-gray-600">
-                  Share the product idea, timeline, and what you want working first.
-                </p>
-              </div>
-              <div className="flex flex-1 flex-col space-y-6">
+            <div>
+              <h3 className="sb-display text-3xl">Tell us what to bake</h3>
+              <p className="mt-2 font-medium text-[#3a332f]">Share the product idea, timeline, and what you want working first.</p>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Your Name *
+                <label htmlFor="name" className={labelClass}>
+                  Your name *
                 </label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="John Doe"
-                  className="w-full rounded-xl border-orange-100 bg-orange-50/30 focus-visible:ring-orange-300"
-                />
+                <input id="name" name="name" type="text" required value={formData.name} onChange={handleChange} placeholder="John Doe" className="sb-input" />
               </div>
-
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
+                <label htmlFor="email" className={labelClass}>
+                  Email address *
                 </label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="john@example.com"
-                  className="w-full rounded-xl border-orange-100 bg-orange-50/30 focus-visible:ring-orange-300"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
-                  Company Name
-                </label>
-                <Input
-                  id="company"
-                  name="company"
-                  type="text"
-                  value={formData.company}
-                  onChange={handleChange}
-                  placeholder="Your Company"
-                  className="w-full rounded-xl border-orange-100 bg-orange-50/30 focus-visible:ring-orange-300"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                  Your project idea *
-                </label>
-                <Textarea
-                  id="message"
-                  name="message"
-                  required
-                  value={formData.message}
-                  onChange={handleChange}
-                  placeholder="Tell us what you'd like us to bake for you..."
-                  rows={6}
-                  className="w-full rounded-xl border-orange-100 bg-orange-50/30 focus-visible:ring-orange-300"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                size="lg"
-                disabled={isSubmitting}
-                className="mt-auto w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 group"
-              >
-                {isSubmitting ? 'Sending...' : 'Send Order'}
-                <Send className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              {submitStatus === 'success' ? (
-                <p className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                  Thank you. We will get back to you with a plan and timeline soon.
-                </p>
-              ) : null}
-              {submitStatus === 'error' ? (
-                <p className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                  We could not send your order right now. Please email us at info@softbake.dev.
-                </p>
-              ) : null}
-              </div>
-            </form>
-          </motion.div>
-
-          {/* Contact Information */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="relative h-full space-y-8"
-          >
-            {/* Info Cards */}
-            <div className="pointer-events-none absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-pink-200/35 to-rose-200/35 blur-2xl" />
-            <div className="flex h-full flex-col rounded-[2rem] border border-orange-100/80 bg-white/85 p-6 shadow-[0_25px_80px_rgba(190,18,60,0.12)] backdrop-blur sm:p-8">
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold text-gray-950">Visit Our Bakery</h3>
-                <p className="mt-2 text-gray-600">
-                  Registered company details and the best inbox for new recipes.
-                </p>
-              </div>
-
-              <div className="flex flex-1 flex-col justify-between gap-4">
-
-              <div className="flex items-start gap-4 rounded-2xl border border-orange-100/70 bg-white/80 p-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-[0_10px_25px_rgba(236,72,153,0.18)]">
-                  <Mail className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">Email Us</div>
-                  <a
-                    href="mailto:info@softbake.dev"
-                    className="text-gray-600 hover:text-orange-600 transition-colors"
-                  >
-                    info@softbake.dev
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 rounded-2xl border border-orange-100/70 bg-white/80 p-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-[0_10px_25px_rgba(236,72,153,0.18)]">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">Company</div>
-                  <p className="text-gray-600">
-                    SoftBake s.r.o.
-                    <br />
-                    IČO: 17856566
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 rounded-2xl border border-orange-100/70 bg-white/80 p-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-[0_10px_25px_rgba(236,72,153,0.18)]">
-                  <FileText className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">Registry</div>
-                  <p className="text-gray-600">
-                    C 377904/MSPH
-                    <br />
-                    Incorporated 21. 12. 2022
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 rounded-2xl border border-orange-100/70 bg-white/80 p-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-[0_10px_25px_rgba(236,72,153,0.18)]">
-                  <MapPin className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">Registered Office</div>
-                  <p className="text-gray-600">
-                    Štorkánova 3236/16, Smíchov
-                    <br />
-                    150 00 Praha 5, Czech Republic
-                  </p>
-                </div>
-              </div>
+                <input id="email" name="email" type="email" required value={formData.email} onChange={handleChange} placeholder="john@example.com" className="sb-input" />
               </div>
             </div>
-          </motion.div>
+
+            <div>
+              <label htmlFor="company" className={labelClass}>
+                Company name
+              </label>
+              <input id="company" name="company" type="text" value={formData.company} onChange={handleChange} placeholder="Your Company" className="sb-input" />
+            </div>
+
+            <div>
+              <label htmlFor="message" className={labelClass}>
+                Your project idea *
+              </label>
+              <textarea
+                id="message"
+                name="message"
+                required
+                value={formData.message}
+                onChange={handleChange}
+                placeholder="Tell us what you'd like us to bake for you..."
+                rows={6}
+                className="sb-input resize-y"
+              />
+            </div>
+
+            <button type="submit" disabled={isSubmitting} className="sb-btn sb-btn--flat group w-full text-lg">
+              {isSubmitting ? 'Sending...' : 'Send order'}
+              <Send className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-rotate-12" />
+            </button>
+
+            {submitStatus === 'success' ? (
+              <motion.p
+                initial={{ scale: 0.6, rotate: -6 }}
+                animate={{ scale: 1, rotate: -1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+                className="rounded-xl border-[2.5px] border-[var(--sb-ink)] bg-[var(--sb-mint)] px-4 py-3 text-sm font-bold"
+                role="status"
+              >
+                Thank you. We will get back to you with a plan and timeline soon.
+              </motion.p>
+            ) : null}
+            {submitStatus === 'error' ? (
+              <p className="rounded-xl border-[2.5px] border-[var(--sb-ink)] bg-[var(--sb-pink)] px-4 py-3 text-sm font-bold" role="alert">
+                We could not send your order right now. Please email us at info@softbake.dev.
+              </p>
+            ) : null}
+          </motion.form>
+
+          <div className="grid gap-5">
+            <h3 className="sb-display text-3xl">Visit our bakery</h3>
+            {infoCards.map((card, i) => {
+              const Icon = card.icon;
+              return (
+                <motion.div
+                  key={card.title}
+                  initial={{ opacity: 0, x: 40 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  whileHover={{ rotate: i % 2 ? 1.5 : -1.5, x: -4 }}
+                  viewport={{ once: true }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 18, delay: i * 0.08 }}
+                  className="sb-card flex items-start gap-4 p-4"
+                >
+                  <span
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border-[2.5px] border-[var(--sb-ink)]"
+                    style={{ background: card.color }}
+                  >
+                    <Icon className="h-6 w-6" strokeWidth={2.25} />
+                  </span>
+                  <div>
+                    <div className="mb-1 font-bold">{card.title}</div>
+                    <div className="font-medium text-[#3a332f]">{card.body}</div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
